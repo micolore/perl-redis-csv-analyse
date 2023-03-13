@@ -11,11 +11,13 @@ use GenerateData;
 
 # 分析redis memory csv 的perl脚本
 # 1、处理千分位问题 // done
-# 2、合并千分位的key，生成一个新的文件（txt、csv） //not must todo
+# 2、合并千分位的key，生成一个新的文件（txt、csv）,保存到数据库。 //not must todo
 # 3、统计出所有的key的大概内存分布情况 // done
 # 4、识别脏key // not must todo (人工识别)
 # 5、筛选出来过大的key //done top10 memory 、top10 count
 # 6、对比多个文件并且生成对比的结果文件。//must todo
+#    1、数量
+#    2、内存
 # 7、修改成一个cli程序（支持多种操作）//not must todo
 # 	  7.1 获取全部的缓存大小
 # 	  7.2 分析统计每个类型的业务key分别占有多少内存大小
@@ -33,18 +35,6 @@ foreach my $f (@ARGV) {
 }
 generate_line_data(\%redis_memory_data);
 
-
-# 处理流程（抽象）
-# 1、处理参数
-# 2、读取文件
-# 3、清洗数据
-# 4、整理数据（获取数据）
-# 5、分析数据
-# 6、生成数据（统计）
-#    6.1 key占比情况（环形）
-#    6.2 占比前十的内存
-
-
 # 计算整体的key的数量、大小（排除掉脏key）
 # 按照逗号进行切割,再按照:切割（9位的需要合并之后再进行切割，8位直接的可以使用）
 # 根据不同的名字进行存储
@@ -55,12 +45,13 @@ sub key_count{
     my $comma_separator = ",";
     my $semicolon_separator = ":";
 	my $exception_count = 9;
+    my $count_limit  = 0;
+    my $memory_limit = 0;
     open( my $data, '<', $file ) or die "Could not open '$file' $!\n";
 	readline $data; # 跳过第一行
     my %redis_key_count_data  = ();
     my %redis_key_memory_data = ();
     my %map_keys = (); # 正则替换完之后的key映射
-    my $s_sum_memory = 0;
     while ( my $line = <$data> ) {
         chomp $line;
         my @fields  = split $comma_separator , $line;
@@ -104,21 +95,6 @@ sub key_count{
             $map_keys{$final_key}= $old_key;
         }
 
-        # 判断指定类型的key内存大小（非必选执行）
-        if($final_key eq 'AAAA-AA-AA'){
-            if ( $size == $exception_count ) {
-                $s_sum_memory += $fields[4];
-            }
-            else {
-                unless ($s_sum_memory += $fields[3]){
-                    #print "异常行数据:",$line ,"\n";
-                }
-            }
-        }
-
-        #if(!$final_key){
-        #    print "new_single_key key:",$line ,"\n";
-        #}
         my $count_val = $redis_key_count_data{$final_key};
         # 计算数量以及内存大小
         if ( defined($count_val) ) {
@@ -141,15 +117,11 @@ sub key_count{
 		my $value = $redis_key_memory_data{$key};
 		my $conveterMemory = byteConvert($value);
 		$sum_memory += $value;
-        #if($conveterMemory > 1){
-        #}
     }
 	my $sum_count;
     foreach my $key ( sort { $redis_key_count_data{$b} <=> $redis_key_count_data{$a} } keys %redis_key_count_data ) {
 		my $value = $redis_key_count_data{$key};
 		$sum_count += $value;
-        #if($value > 2){
-        #}
     }
     # 创建对象
     my $object = new Memory();
@@ -158,23 +130,11 @@ sub key_count{
     # perl对象存储非标量数据，使用的是引用（类似c++），要先处理成引用类型。
     my $redis_key_count_data_href = \%redis_key_count_data;
     my $redis_key_memory_data_href = \%redis_key_memory_data;
+    my $map_keys_href = \%map_keys;
     $object->setKeyCountData($redis_key_count_data_href);
     $object->setKeyMemoryData($redis_key_memory_data_href);
     $object->setKeyTotalMemory($sum_memory);
     $object->setKeyTotalCount($sum_count);
-
-    # 获取之后需要进行解引用（类似go里面的指针？）
-    #my $keyCountDataValueHref = $object->getKeyCountData();
-    #my %h = %{$keyCountDataValueHref};
-    # check value is right
-    #print "redis_key_memory_data-2:" , $h{':appapp_user_last_login_log'} , "\n";
-    #my %h = $object->getKeyCountData();
-    #print "redis_key_memory_data-2:" , $h{':appapp_user_last_login_log'} , "\n";
-
-
-    #print "\n\n\n--------key映射-----------\n";
-    #while((my $key, my $value) = each(%map_keys)){
-    #	print "业务key-正则前:",$value ,",正则后:" ,$key ,"\n";
-    #}
+    $object->setMapTotalMemoryKey($map_keys_href);
     return $object;
 }
