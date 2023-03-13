@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+  <script src="../lib//echarts.min.js"></script>
+  <script src="data.js"></script>
+  <head>
+    <meta content="text/html; charset=utf-8" />
+    <title>Redis内存分析数据图表</title>
+  </head>
+  <body>
+    <div id="count" style="width: 2500px; height: 600px;"></div>
+    <div id="memory" style="width: 2500px; height: 600px;"></div>
+  </body>
+  <script>
+    //drawData('count', data.key, data.count_data)
+    drawData('memory', data.key, data.memory_data)
+
+    function drawData(divId, categoryData, valueData) {
+      var seriesData = []
+      for (var i = 0; i < valueData.length; i++) {
+        var d = {}
+        d.data = valueData[i].data
+        d.type = 'line'
+        d.smooth = true
+        d.connectNulls = false
+        seriesData.push(d)
+      }
+
+      var chartDom = document.getElementById(divId)
+      var myChart = echarts.init(chartDom)
+      var option
+      option = {
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: {
+            type: 'cross',
+            crossStyle: {
+              color: '#999',
+            },
+          },
+          formatter: function (params) {
+            let firstParams = params[0]
+            let sndParams = params[1]
+            return (
+              firstParams.name +
+              '  ' +
+              '<br>' +
+              '对比:<br>' +
+              firstParams.data +
+              '<br> ' +
+              sndParams.data +
+              ' '
+            )
+          },
+        },
+        xAxis: {
+          type: 'category',
+          data: categoryData,
+          axisLabel: {
+            interval: 2,
+            rotate: 40,
+          },
+        },
+        yAxis: {
+          type: 'value',
+        },
+        series: seriesData,
+      }
+      option && myChart.setOption(option)
+    }
+  </script>
+</html>
